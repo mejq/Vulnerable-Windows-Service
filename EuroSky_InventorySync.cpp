@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 // Service name definition
-#define SERVICE_NAME  _T("EuroSky_InventorySync")
+TCHAR SERVICE_NAME[] = _T("EuroSky_InventorySync");
 
 SERVICE_STATUS        g_ServiceStatus = {0};
 SERVICE_STATUS_HANDLE g_StatusHandle = NULL;
@@ -21,15 +21,24 @@ typedef void (*StartSyncFunc)();
 // Vulnerable function that attempts to load a DLL without specifying a full path.
 void InitializeSyncPlugin() {
 
-    const char* dllPath = "inventory_helper_ext.dll";
-    HINSTANCE hDll = LoadLibraryA(dllPath);
+    const char* pluginPath = "inventory_helper_ext.dll";
+    HINSTANCE hPlugin = LoadLibraryA(pluginPath);
 
-    if (hDll != NULL) {
+    if (hPlugin != NULL) {
         // DLL loaded successfully, now we search "StartSync" func in it.
-        StartSyncFunc pStartSync = (StartSyncFunc) GetProcAddress(hDll, "StartSync");
-
-    } else {
-        OutputDebugString(_T("EuroSky_InventorySync: StartSync function not found in DLL."));
+        StartSyncFunc pInitPlugin = (StartSyncFunc) GetProcAddress(hPlugin, "StartSync");
+        if (pInitPlugin != NULL) {
+            pInitPlugin(); // Call the function to start the sync process.
+        } else {
+            OutputDebugString(_T("EuroSky_InventorySync: StartSync function not found in DLL."));
+        }
+        FreeLibrary(hPlugin); // Unload the DLL after use.
+    } 
+    
+    else {
+        OutputDebugString(_T("EuroSky_InventorySync: Failed to load plugin: inventory_helper_ext.dll. Proceeding with default sync."));
+        // If the DLL fails to load, we can proceed with a default sync process or log the error.
+        // For demonstration, we will just log the error and not perform any sync.
     }
 }
 
@@ -131,7 +140,7 @@ DWORD WINAPI ServiceWorkerThread (LPVOID lpParam) {
     InitializeSyncPlugin();
 
     while (WaitForSingleObject(g_ServiceStopEvent, 0) != WAIT_OBJECT_0) {
-        Sleep(3000); 
+        Sleep(3600000); // Sleep for 1 hour (3600000 milliseconds)
     }
     return ERROR_SUCCESS;
 }
